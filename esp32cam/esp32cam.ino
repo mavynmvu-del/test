@@ -21,7 +21,7 @@
 #define PCLK_GPIO_NUM     22
 
 const char* ssid     = "poop";
-const char* password = "poop";
+const char* password = "pooppoop";
 
 #define PART_BOUNDARY "123456789000000000000987654321"
 
@@ -120,7 +120,11 @@ void setup() {
     return;
   }
 
-  WiFi.begin(ssid, password);
+  Serial.print("SSID: ");
+  Serial.println(ssid);
+  Serial.print("Password: ");
+  Serial.println(password);
+  WiFi.begin(ssid, password, 6);
   Serial.print("Connecting to WiFi");
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);

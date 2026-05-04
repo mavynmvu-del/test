@@ -121,37 +121,66 @@ var billboards = [
   makeBillboard('ascii_home.png',                new THREE.Vector3( 6.8, 2.5, -100), 5.0, 4.0, 'nhà'),
 ];
 
-// ─── WEBCAM ──────────────────────────────────────────────────────────────────
+// ─── ESP32-CAM STREAM ────────────────────────────────────────────────────────
+// Change this IP to match whatever the DHCP server assigns to the ESP32-CAM.
+// On a standard hostapd/dnsmasq AP the first client is usually 192.168.4.2.
+var ESP32_STREAM_URL = 'http://192.168.4.154/stream';
+
 var webcamMesh = null;
 function setupWebcam() {
-  var vid = document.createElement('video');
-  vid.autoplay = true; vid.playsInline = true; vid.muted = true;
-  navigator.mediaDevices.getUserMedia({ video: true }).then(function (stream) {
-    vid.srcObject = stream;
-    vid.play();
-    var tex = new THREE.VideoTexture(vid);
-    tex.minFilter = THREE.LinearFilter;
-    webcamMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(10, 7),
-      new THREE.MeshBasicMaterial({ map: tex })
-    );
-    webcamMesh.position.set(0, 3, -118);
-    scene.add(webcamMesh);
+  var canvas = document.createElement('canvas');
+  canvas.width  = 640;
+  canvas.height = 480;
+  var ctx = canvas.getContext('2d');
 
-    // Label
-    var c = document.createElement('canvas');
-    c.width = 512; c.height = 64;
-    var cx = c.getContext('2d');
-    cx.fillStyle = '#f0ede6'; cx.fillRect(0,0,512,64);
-    cx.fillStyle = '#111'; cx.font = '26px Courier New'; cx.textAlign = 'center';
-    cx.fillText('cháu có nhơ ông', 256, 42);
-    var lbl = new THREE.Mesh(
-      new THREE.PlaneGeometry(6, 0.6),
-      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true })
-    );
-    lbl.position.set(0, 7.2, -118);
-    scene.add(lbl);
-  }).catch(function (e) { console.warn('Webcam:', e); });
+  var tex = new THREE.CanvasTexture(canvas);
+  tex.minFilter = THREE.LinearFilter;
+
+  webcamMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(10, 7),
+    new THREE.MeshBasicMaterial({ map: tex })
+  );
+  webcamMesh.position.set(0, 3, -118);
+  scene.add(webcamMesh);
+
+  // Label
+  var c = document.createElement('canvas');
+  c.width = 512; c.height = 64;
+  var cx = c.getContext('2d');
+  cx.fillStyle = '#f0ede6'; cx.fillRect(0,0,512,64);
+  cx.fillStyle = '#111'; cx.font = '26px Courier New'; cx.textAlign = 'center';
+  cx.fillText('cháu có nhơ ông', 256, 42);
+  var lbl = new THREE.Mesh(
+    new THREE.PlaneGeometry(6, 0.6),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true })
+  );
+  lbl.position.set(0, 7.2, -118);
+  scene.add(lbl);
+
+  // MJPEG stream: keep a hidden <img> the browser updates continuously,
+  // then blit it onto the canvas texture each render frame.
+  var img = document.createElement('img');
+  img.crossOrigin = 'anonymous';
+  // visibility:hidden keeps it in the render tree so the browser keeps
+  // pushing MJPEG frames into it; display:none or off-screen can pause it.
+  img.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;visibility:hidden;';
+  document.body.appendChild(img);
+  function loadStream() {
+    img.src = '';
+    img.src = ESP32_STREAM_URL;
+  }
+  img.onerror = function () {
+    console.warn('ESP32 stream unreachable, retrying in 3s…');
+    setTimeout(loadStream, 3000);
+  };
+  loadStream();
+
+  webcamMesh.userData.updateTex = function () {
+    try {
+      ctx.drawImage(img, 0, 0, 640, 480);
+      tex.needsUpdate = true;
+    } catch (e) {}
+  };
 }
 
 // ─── AUDIO SYSTEM ────────────────────────────────────────────────────────────
@@ -438,6 +467,9 @@ function animate() {
   // Audio
   updateSpatialSounds();
   updateConnectLoop();
+
+  // Stream texture
+  if (webcamMesh && webcamMesh.userData.updateTex) webcamMesh.userData.updateTex();
 
   // Labels
   var lbl = '';

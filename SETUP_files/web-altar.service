@@ -1,0 +1,13 @@
+[Unit]
+Description=web altar HTTP server
+After=network.target
+
+[Service]
+Type=simple
+User=poop
+WorkingDirectory=/home/poop/Desktop/web altar
+ExecStart=/usr/bin/python3 -m http.server 8080
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
